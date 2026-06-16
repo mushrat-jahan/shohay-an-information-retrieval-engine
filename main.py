@@ -2,12 +2,10 @@
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from pathlib import Path
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse
 from pydantic import BaseModel
-
 from retriever import load_retriever, TurboVecRetriever
 from generator import generate, generate_stream
 from config import (
@@ -15,7 +13,7 @@ from config import (
     TOP_K, TEMPERATURE, MAX_TOKENS,
 )
 
-# ── App state ─────────────────────────────────────────────────────────────────
+# ── App state 
 
 retriever: TurboVecRetriever | None = None
 
@@ -24,7 +22,7 @@ retriever: TurboVecRetriever | None = None
 async def lifespan(app: FastAPI):
     global retriever
     print(f"[Startup] Building turbovec index from {CSV_PATH} …")
-    print(f"[Startup] Embed  : {EMBED_MODEL} (in-process)")
+    print(f"[Startup] Embed : {EMBED_MODEL} (in-process)")
     print(f"[Startup] Generate: {MODEL_NAME} @ {VLLM_URL}")
     retriever = load_retriever(
         csv_path   = CSV_PATH,
@@ -54,24 +52,24 @@ class Message(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    query:   str
-    top_k:   Optional[int]          = None
-    stream:  Optional[bool]         = False
+    query: str
+    top_k: Optional[int] = None
+    stream: Optional[bool] = False
     history: Optional[List[Message]] = []
 
 
 class PassageInfo(BaseModel):
-    id:           int
-    category:     str
+    id: int
+    category: str
     sub_category: str
-    topic:        str
-    score:        float
-    url:          str
+    topic: str
+    score: float
+    url: str
 
 
 class QueryResponse(BaseModel):
-    query:    str
-    answer:   str
+    query:str
+    answer:str
     passages: List[PassageInfo]
 
 
@@ -80,11 +78,11 @@ class QueryResponse(BaseModel):
 @app.get("/health")
 def health():
     return {
-        "status":          "ok",
+        "status": "ok",
         "passages_loaded": len(retriever.docs) if retriever else 0,
-        "index_backend":   "turbovec (4-bit, in-process)",
-        "embed_model":     EMBED_MODEL,
-        "gen_model":       MODEL_NAME,
+        "index_backend": "turbovec (4-bit, in-process)",
+        "embed_model": EMBED_MODEL,
+        "gen_model": MODEL_NAME,
     }
 
 
@@ -97,13 +95,13 @@ async def query_endpoint(req: QueryRequest):
     passages = retriever.retrieve(req.query, top_k=k)
 
     answer = await generate(
-        query       = req.query,
-        passages    = passages,
-        base_url    = VLLM_URL,
-        model       = MODEL_NAME,
+        query = req.query,
+        passages = passages,
+        base_url = VLLM_URL,
+        model = MODEL_NAME,
         temperature = TEMPERATURE,
-        max_tokens  = MAX_TOKENS,
-        history     = [m.model_dump() for m in req.history] if req.history else None,
+        max_tokens = MAX_TOKENS,
+        history = [m.model_dump() for m in req.history] if req.history else None,
     )
 
     return QueryResponse(
@@ -111,12 +109,12 @@ async def query_endpoint(req: QueryRequest):
         answer   = answer,
         passages = [
             PassageInfo(
-                id           = p["id"],
-                category     = p["category"],
+                id = p["id"],
+                category = p["category"],
                 sub_category = p["sub_category"],
-                topic        = p["topic"],
-                score        = round(p["score"], 4),
-                url          = p["url"],
+                topic = p["topic"],
+                score = round(p["score"], 4),
+                url = p["url"],
             )
             for p in passages
         ],
@@ -134,13 +132,13 @@ async def query_stream_endpoint(req: QueryRequest):
 
     async def token_generator():
         async for token in generate_stream(
-            query       = req.query,
-            passages    = passages,
-            base_url    = VLLM_URL,
-            model       = MODEL_NAME,
+            query = req.query,
+            passages = passages,
+            base_url = VLLM_URL,
+            model = MODEL_NAME,
             temperature = TEMPERATURE,
-            max_tokens  = MAX_TOKENS,
-            history     = history,
+            max_tokens = MAX_TOKENS,
+            history = history,
         ):
             yield token
 

@@ -19,7 +19,7 @@ def get_client(base_url: str, api_key: str = "not-needed") -> openai.AsyncOpenAI
     return _client
 
 
-# ── Prompt builder ──────────────────────────────────────────────────────────
+# ── Prompt builder 
 
 
 def build_prompt(
@@ -27,7 +27,6 @@ def build_prompt(
     passages: List[Dict[str, Any]],
     history: List[Dict[str, str]] | None = None,
 ) -> List[Dict[str, str]]:
-    """Build the chat messages list for the vLLM API call."""
     if not passages:
         context_block = "No relevant passages found."
     else:

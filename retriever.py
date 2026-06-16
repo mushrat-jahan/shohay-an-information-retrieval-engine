@@ -3,14 +3,12 @@ import re
 import unicodedata
 import time
 from typing import List, Dict, Any, Optional
-
 import numpy as np
 import pandas as pd
 import torch
 from sentence_transformers import SentenceTransformer
 from turbovec import IdMapIndex
-
-from config import EMBED_MODEL
+from config import EMBED_MODEL, HF_TOKEN
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -21,7 +19,7 @@ BATCH_SIZE = 4
 
 QUERY_TASK = (
     "Given a user question about Bangladeshi government services, "
-    "retrieve the most relevant passage that answers it."
+    "retrieve the most relevant passage that answers the question."
 )
 
 
@@ -57,13 +55,13 @@ def build_documents(df: pd.DataFrame) -> List[Dict[str, Any]]:
     docs = []
     for _, row in df.iterrows():
         docs.append({
-            "id":           _safe_int(row.get("Passage ID"), len(docs)),
-            "category":     normalise(str(row.get("Category", ""))),
+            "id": _safe_int(row.get("Passage ID"), len(docs)),
+            "category": normalise(str(row.get("Category", ""))),
             "sub_category": normalise(str(row.get("Sub-Category", ""))),
-            "service":      normalise(str(row.get("Service", ""))),
-            "topic":        normalise(str(row.get("Topic", ""))),
-            "answer":       str(row.get("Text", "")),
-            "url":          str(row.get("URL", "")),
+            "service": normalise(str(row.get("Service", ""))),
+            "topic": normalise(str(row.get("Topic", ""))),
+            "answer": str(row.get("Text", "")),
+            "url": str(row.get("URL", "")),
         })
     return docs
 
@@ -84,9 +82,13 @@ class TurboVecRetriever:
         self._slot_to_doc: Dict[int, Dict[str, Any]] = {i: d for i, d in enumerate(docs)}
         self._index: Optional[IdMapIndex] = None
 
+        if HF_TOKEN:
+            from huggingface_hub import login
+            login(token=HF_TOKEN, add_to_git_credential=False)
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"[TurboVec] Loading {model_name} on {device} …")
-        self._model = SentenceTransformer(model_name, device=device)
+        self._model = SentenceTransformer(model_name, device=device, trust_remote_code=True)
         print("[TurboVec] Model ready.")
 
     def build_index(self, index_path: Optional[str] = None) -> None:
