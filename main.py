@@ -1,4 +1,4 @@
-
+import json
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from pathlib import Path
@@ -7,16 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse
 from pydantic import BaseModel
 from retriever import load_retriever, TurboVecRetriever
-from generator import generate, generate_stream
-from config import (
-    CSV_PATH, VLLM_URL, MODEL_NAME, EMBED_MODEL, INDEX_PATH,
-    TOP_K, TEMPERATURE, MAX_TOKENS,
-)
-
-# ── App state 
+from generator import generate, generate_stream, contextualize_query
+from config import ( CSV_PATH, VLLM_URL, MODEL_NAME, EMBED_MODEL, INDEX_PATH, TOP_K, TEMPERATURE, MAX_TOKENS,)
+from fastapi.staticfiles import StaticFiles
 
 retriever: TurboVecRetriever | None = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +31,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Bengali QA RAG API", version="2.0.0", lifespan=lifespan)
 
+app.mount("/static", StaticFiles(directory="fonts"), name="static")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,7 +41,7 @@ app.add_middleware(
 )
 
 
-# ── Request / Response schemas ────────────────────────────────────────────────
+# ── Request / Response schemas 
 
 class Message(BaseModel):
     role: str       # "user" or "assistant"
@@ -73,7 +70,7 @@ class QueryResponse(BaseModel):
     passages: List[PassageInfo]
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Endpoints 
 
 @app.get("/health")
 def health():
@@ -91,8 +88,11 @@ async def query_endpoint(req: QueryRequest):
     if retriever is None:
         raise HTTPException(503, "Retriever not ready")
 
-    k        = req.top_k or TOP_K
-    passages = retriever.retrieve(req.query, top_k=k)
+    k = req.top_k or TOP_K
+    history = [m.model_dump() for m in req.history] if req.history else None
+
+    retrieval_query = await contextualize_query(req.query, history or [], VLLM_URL)
+    passages = retriever.retrieve(retrieval_query, top_k=k)
 
     answer = await generate(
         query = req.query,
@@ -101,7 +101,7 @@ async def query_endpoint(req: QueryRequest):
         model = MODEL_NAME,
         temperature = TEMPERATURE,
         max_tokens = MAX_TOKENS,
-        history = [m.model_dump() for m in req.history] if req.history else None,
+        history = history,
     )
 
     return QueryResponse(
@@ -126,11 +126,23 @@ async def query_stream_endpoint(req: QueryRequest):
     if retriever is None:
         raise HTTPException(503, "Retriever not ready")
 
-    k        = req.top_k or TOP_K
-    passages = retriever.retrieve(req.query, top_k=k)
-    history  = [m.model_dump() for m in req.history] if req.history else None
+    k = req.top_k or TOP_K
+    history = [m.model_dump() for m in req.history] if req.history else None
+
+    retrieval_query = await contextualize_query(req.query, history or [], VLLM_URL)
+    passages = retriever.retrieve(retrieval_query, top_k=k)
+
+    passage_meta = json.dumps([
+        {
+            "id": p["id"], "category": p["category"],
+            "sub_category": p["sub_category"], "topic": p["topic"],
+            "score": round(p["score"], 4), "url": p["url"],
+        }
+        for p in passages
+    ])
 
     async def token_generator():
+        yield passage_meta + "\n---END_PASSAGES---\n"
         async for token in generate_stream(
             query = req.query,
             passages = passages,
@@ -141,7 +153,6 @@ async def query_stream_endpoint(req: QueryRequest):
             history = history,
         ):
             yield token
-
     return StreamingResponse(token_generator(), media_type="text/plain")
 
 
@@ -155,7 +166,6 @@ async def search_passages(q: str, top_k: int = 5):
 
 
 BASE_DIR = Path(__file__).resolve().parent
-
 @app.get("/", response_class=HTMLResponse)
 def chat_ui():
     with open(BASE_DIR / "index.html", encoding="utf-8") as f:

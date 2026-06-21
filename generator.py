@@ -51,6 +51,37 @@ def build_prompt(
     return messages
 
 
+# ── Query contextualization ─────────────────────────────────────────────────
+
+_CONTEXTUALIZE_PROMPT = (
+    "Given the conversation history and the latest user message, "
+    "if the latest message is a short follow-up or refers to something in the history, "
+    "rewrite it as a complete, self-contained search query. "
+    "If it is already a full standalone question, return it unchanged. "
+    "Output ONLY the rewritten query — no explanation, no extra text."
+)
+
+async def contextualize_query(
+    query: str,
+    history: List[Dict[str, str]],
+    base_url: str,
+    model: str = MODEL_NAME,
+) -> str:
+    if not history:
+        return query
+    client = get_client(base_url)
+    messages = [{"role": "system", "content": _CONTEXTUALIZE_PROMPT}]
+    messages.extend(history[-4:])   # last 2 turns is enough
+    messages.append({"role": "user", "content": query})
+    response = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0,
+        max_tokens=128,
+    )
+    return response.choices[0].message.content.strip()
+
+
 # ── Generation (non-streaming) ──────────────────────────────────────────────
 
 async def generate(
