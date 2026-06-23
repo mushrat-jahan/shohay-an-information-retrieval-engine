@@ -168,5 +168,5 @@ async def search_passages(q: str, top_k: int = 5):
 BASE_DIR = Path(__file__).resolve().parent
 @app.get("/", response_class=HTMLResponse)
 def chat_ui():
-    with open(BASE_DIR / "index.html", encoding="utf-8") as f:
+    with open(BASE_DIR / "frontend" / "index.html", encoding="utf-8") as f:
         return f.read()
