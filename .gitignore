@@ -1,6 +1,8 @@
 venv/
 BM25(test).py
+prompt2.py
 Dataset/
 __pycache__/
 config.py
 start.sh
+test.py

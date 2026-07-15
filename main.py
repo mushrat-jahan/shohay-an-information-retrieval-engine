@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse
 from pydantic import BaseModel
 from retriever import load_retriever, TurboVecRetriever
-from generator import generate, generate_stream, contextualize_query
-from config import ( CSV_PATH, VLLM_URL, MODEL_NAME, EMBED_MODEL, INDEX_PATH, TOP_K, TEMPERATURE, MAX_TOKENS,)
+from generator import generate_with_tools, generate_stream_with_tools, contextualize_query
+from config import ( CSV_PATH, VLLM_URL, MODEL_NAME, EMBED_MODEL, INDEX_PATH, TOP_K, MIN_SCORE, TEMPERATURE, MAX_TOKENS,)
 from fastapi.staticfiles import StaticFiles
 
 retriever: TurboVecRetriever | None = None
@@ -92,9 +92,9 @@ async def query_endpoint(req: QueryRequest):
     history = [m.model_dump() for m in req.history] if req.history else None
 
     retrieval_query = await contextualize_query(req.query, history or [], VLLM_URL)
-    passages = retriever.retrieve(retrieval_query, top_k=k)
+    passages = retriever.retrieve(retrieval_query, top_k=k, min_score=MIN_SCORE)
 
-    answer = await generate(
+    answer = await generate_with_tools(
         query = req.query,
         passages = passages,
         base_url = VLLM_URL,
@@ -130,7 +130,7 @@ async def query_stream_endpoint(req: QueryRequest):
     history = [m.model_dump() for m in req.history] if req.history else None
 
     retrieval_query = await contextualize_query(req.query, history or [], VLLM_URL)
-    passages = retriever.retrieve(retrieval_query, top_k=k)
+    passages = retriever.retrieve(retrieval_query, top_k=k, min_score=MIN_SCORE)
 
     passage_meta = json.dumps([
         {
@@ -143,7 +143,7 @@ async def query_stream_endpoint(req: QueryRequest):
 
     async def token_generator():
         yield passage_meta + "\n---END_PASSAGES---\n"
-        async for token in generate_stream(
+        async for token in generate_stream_with_tools(
             query = req.query,
             passages = passages,
             base_url = VLLM_URL,

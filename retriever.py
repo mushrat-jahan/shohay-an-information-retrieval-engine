@@ -13,7 +13,7 @@ from turbovec import IdMapIndex
 from config import EMBED_MODEL, HF_TOKEN
 
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# ── Constants 
 
 DIM        = 4096   
 BIT_WIDTH  = 4      
@@ -25,7 +25,7 @@ QUERY_TASK = (
 )
 
 
-# ── Text helpers ──────────────────────────────────────────────────────────────
+# ── Text helpers 
 
 def normalise(text: str) -> str:
     if not isinstance(text, str):
@@ -128,7 +128,7 @@ class TurboVecRetriever:
             self._index.write(index_path)
             print(f"[TurboVec] Index saved to {index_path}")
 
-    def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = 5, min_score: float = 0.0) -> List[Dict[str, Any]]:
         if self._index is None:
             raise RuntimeError("Index not built — call build_index() first")
 
@@ -141,6 +141,8 @@ class TurboVecRetriever:
 
         results = []
         for score, slot in zip(scores[0], slot_ids[0]):
+            if score < min_score:
+                continue
             doc = self._slot_to_doc.get(int(slot))
             if doc is None:
                 continue
