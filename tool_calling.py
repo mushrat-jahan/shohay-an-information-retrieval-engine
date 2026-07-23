@@ -12,11 +12,14 @@ TOOLS: List[Dict[str, Any]] = [
         "function": {
             "name": "web_search",
             "description": (
-                "Search the live web via DuckDuckGo. Use this only when the question "
-                "needs current or up-to-date information that the government knowledge "
-                "base passages don't cover (e.g. recent news, a fee/rule that may have "
-                "changed, something outside the local dataset)."
-            ),
+                "Search the live web via DuckDuckGo for CURRENT, real-time information only: "
+                "today's weather, current prices, breaking news, sports scores, or facts that "
+                "change daily. Do NOT use this for government service facts, fees, procedures, "
+                "or eligibility rules — those must come from the provided context passages only, "
+                "even if the passages seem incomplete. Write the query in the same language as "
+                "the user's question, and include specific terms (city names, dates, product names) "
+                "to get precise results."
+                ),
             "parameters": {
                 "type": "object",
                 "properties": {

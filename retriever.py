@@ -42,7 +42,6 @@ def _safe_int(val, fallback: int) -> int:
 
 
 def _format_query(query: str) -> str:
-    # e5-mistral requires task instruction prefix on queries only
     return f"Instruct: {QUERY_TASK}\nQuery: {query}"
 
 
